@@ -1,0 +1,198 @@
+	/*
+    MM-TXS04(LSM330DLC) control sample
+    for I2C connecting
+    2014/2/3 Sunhayato Corp.
+*/
+
+#include <Wire.h>
+
+/*
+connecting
+
+MM-TXS04(LSM330DLC) Arduino(Duemilanove/UNO)
+1:VDD---------------5V
+2:GND---------------GND
+3:SDA---------------A4(I2C:SDA)
+4:CLK---------------A5(I2C:SCL)
+5:SDO(SA0)----------GND
+6:INT1_A
+7:INT2_A
+8:INT1_G
+9:INT2_G
+10:DEN_G------------5V
+11:CS_A-------------5V
+12:CS_G-------------5V
+*/
+
+#include <Wire.h>
+
+
+// LSM330D I2C address
+// Accelerometer = 001100xb
+#define LSM330D_A_ADDR0     0b00011000  // SA0=0(GND)
+#define LSM330D_A_ADDR1     0b00011001  // SA0=1(VDD)
+
+// gyro = 110101xb
+#define LSM330D_G_ADDR0     0b01101010  // SA0=0(GND)
+#define LSM330D_G_ADDR1     0b01101011  // SA0=1(VDD)
+
+byte addr_A = LSM330D_A_ADDR0;
+byte addr_G = LSM330D_G_ADDR0;
+
+// LSM330D Register Map
+// Acceleromete
+#define LSM330D_CTRL_REG1_A     0x20
+#define LSM330D_CTRL_REG2_A     0x21
+#define LSM330D_CTRL_REG3_A     0x22
+#define LSM330D_CTRL_REG4_A     0x23
+#define LSM330D_CTRL_REG5_A     0x24
+
+#define LSM330D_OUT_X_L_A       0x28
+#define LSM330D_OUT_X_H_A       0x29
+#define LSM330D_OUT_Y_L_A       0x2A
+#define LSM330D_OUT_Y_H_A       0x2B
+#define LSM330D_OUT_Z_L_A       0x2C
+#define LSM330D_OUT_Z_H_A       0x2D
+
+
+// gyro
+#define LSM330D_WHO_AM_I_G      0x0F
+#define LSM330D_WHOAMI_G_VAL    0xD4
+
+#define LSM330D_CTRL_REG1_G     0x20
+#define LSM330D_CTRL_REG2_G     0x21
+#define LSM330D_CTRL_REG3_G     0x22
+#define LSM330D_CTRL_REG4_G     0x23
+#define LSM330D_CTRL_REG5_G     0x24
+
+#define LSM330D_OUT_X_L_G       0x28
+#define LSM330D_OUT_X_H_G       0x29
+#define LSM330D_OUT_Y_L_G       0x2A
+#define LSM330D_OUT_Y_H_G       0x2B
+#define LSM330D_OUT_Z_L_G       0x2C
+#define LSM330D_OUT_Z_H_G       0x2D
+
+
+
+void setup() {
+    
+    byte data;
+    
+    Serial.begin(9600);
+    Wire.begin();
+    
+    readReg(addr_G, LSM330D_WHO_AM_I_G, 1, &data);
+    
+    if (data != LSM330D_WHOAMI_G_VAL)
+    {
+        Serial.println("Failed to detect LSM330DLC");
+        while (1);
+    }
+    
+    // Accelerometer
+    writeReg(addr_A, LSM330D_CTRL_REG1_A, 0b10010111);
+    writeReg(addr_A, LSM330D_CTRL_REG2_A, 0b00000000);
+    writeReg(addr_A, LSM330D_CTRL_REG3_A, 0b00001000);
+    writeReg(addr_A, LSM330D_CTRL_REG4_A, 0b00001000);  // +/-2G (1mg/digt)
+    writeReg(addr_A, LSM330D_CTRL_REG5_A, 0b01000000);
+    
+    // Gyro
+    writeReg(addr_G, LSM330D_CTRL_REG1_G, 0b00001111);
+    writeReg(addr_G, LSM330D_CTRL_REG2_G, 0b00000000);
+    writeReg(addr_G, LSM330D_CTRL_REG3_G, 0b00000000);
+    writeReg(addr_G, LSM330D_CTRL_REG4_G, 0b00000000);  // 250dps (8.75mdps/digit)
+    writeReg(addr_G, LSM330D_CTRL_REG5_G, 0b00000000);
+    
+}
+
+void loop() {
+    
+    byte Buffer[6];
+    
+    short AccelRaw_x, AccelRaw_y, AccelRaw_z;
+    short GyroRaw_x,  GyroRaw_y,  GyroRaw_z;
+    
+    float Accel_x, Accel_y, Accel_z;
+    float Gyro_x,  Gyro_y,  Gyro_z;
+    
+    
+    // Accelerometer
+    readReg(addr_A, LSM330D_OUT_X_L_A, 6, Buffer);
+    
+    AccelRaw_x = ((Buffer[1] << 8) | Buffer[0]);
+    AccelRaw_x = AccelRaw_x >> 4;
+    Accel_x = AccelRaw_x * 0.001;
+    
+    AccelRaw_y = ((Buffer[3] << 8) | Buffer[2]);
+    AccelRaw_y = AccelRaw_y >> 4;
+    Accel_y = AccelRaw_y * 0.001;
+    
+    AccelRaw_z = ((Buffer[5] << 8) | Buffer[4]);
+    AccelRaw_z = AccelRaw_z >> 4;
+    Accel_z = AccelRaw_z * 0.001;
+    
+    
+    // Gyro
+    readReg(addr_G, LSM330D_OUT_X_L_G, 6, Buffer);
+    
+    GyroRaw_x = ((Buffer[1] << 8) | Buffer[0]);
+    Gyro_x = GyroRaw_x * 0.00875;
+    
+    GyroRaw_y = ((Buffer[3] << 8) | Buffer[2]);
+    Gyro_y = GyroRaw_y * 0.00875;
+    
+    GyroRaw_z = ((Buffer[5] << 8) | Buffer[4]);
+    Gyro_z = GyroRaw_z * 0.00875;
+    
+    
+    // output serial
+    Serial.print("Accel:\t");
+    Serial.print(Accel_x);
+    Serial.print(",\t");
+    Serial.print(Accel_y);
+    Serial.print(",\t");
+    Serial.print(Accel_z);
+    Serial.print(",\t");
+    
+    Serial.print("|Gyro:\t");
+    Serial.print(Gyro_x);
+    Serial.print(",\t");
+    Serial.print(Gyro_y);
+    Serial.print(",\t");
+    Serial.print(Gyro_z);
+    Serial.print("\n");
+    
+    delay(500);
+}
+
+
+void writeReg(byte addr, byte reg, byte value)
+{
+    Wire.beginTransmission(addr);
+    Wire.write(reg);
+    Wire.write(value);
+    Wire.endTransmission();
+}
+
+
+void readReg(byte addr, byte reg, byte len, byte *data)
+{
+    byte i;
+    
+    Wire.beginTransmission(addr);
+    Wire.write(reg | 0x80);         // bit7-ON (subaddress updating)
+    Wire.endTransmission();
+    
+    Wire.requestFrom(addr, len);
+    
+    for (i = 0; i < len; i++){
+        if (Wire.available()){
+            *data = Wire.read();
+        } else {
+            *data = 0x00;
+        }
+        data ++;
+    }
+    
+    Wire.endTransmission();
+}
